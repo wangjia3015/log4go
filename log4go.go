@@ -194,7 +194,7 @@ func (log Logger) intLogf(lvl level, format string, args ...interface{}) {
 	if skip {
 		return
 	}
-
+	
 	// Determine caller func
 	pc, _, lineno, ok := runtime.Caller(2)
 	src := ""
@@ -222,6 +222,12 @@ func (log Logger) intLogf(lvl level, format string, args ...interface{}) {
 		}
 		filt.LogWrite(rec)
 	}
+}
+
+// add a flush all function 
+func (log Logger) FlushAll() {
+	// TODO every writer has a function Flush . It can be Flush when close
+	
 }
 
 // Send a closure log message internally

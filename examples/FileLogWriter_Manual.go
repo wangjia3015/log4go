@@ -16,7 +16,7 @@ const (
 
 func main() {
 	// Get a new logger instance
-	log := l4g.NewLogger()
+	log := make(l4g.Logger)
 
 	// Create a default logger that is logging messages of FINE or higher
 	log.AddFilter("file", l4g.FINE, l4g.NewFileLogWriter(filename, false))
@@ -54,4 +54,5 @@ func main() {
 
 	// Remove the file so it's not lying around
 	os.Remove(filename)
+	time.Sleep(1000)
 }

@@ -161,7 +161,10 @@ func (w *FileLogWriter) intRotate() error {
 		return err
 	}
 	w.file = fd
-
+	
+	// TODO set buffer
+	sb.Writer = bufio.NewWriterSize(w.file, bufferSize)
+	
 	now := time.Now()
 	fmt.Fprint(w.file, FormatLogRecord(w.header, &LogRecord{Created: now}))
 
