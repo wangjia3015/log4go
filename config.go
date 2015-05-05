@@ -104,14 +104,14 @@ func (log Logger) LoadConfiguration(filename string) {
 		}
 
 		switch xmlfilt.Type {
-		case "console":
-			filt, good = xmlToConsoleLogWriter(filename, xmlfilt.Property, enabled)
+//		case "console":
+//			filt, good = xmlToConsoleLogWriter(filename, xmlfilt.Property, enabled)
 		case "file":
 			filt, good = xmlToFileLogWriter(filename, xmlfilt.Property, enabled)
-		case "xml":
-			filt, good = xmlToXMLLogWriter(filename, xmlfilt.Property, enabled)
-		case "socket":
-			filt, good = xmlToSocketLogWriter(filename, xmlfilt.Property, enabled)
+//		case "xml":
+//			filt, good = xmlToXMLLogWriter(filename, xmlfilt.Property, enabled)
+//		case "socket":
+//			filt, good = xmlToSocketLogWriter(filename, xmlfilt.Property, enabled)
 		default:
 			fmt.Fprintf(os.Stderr, "LoadConfiguration: Error: Could not load XML configuration in %s: unknown filter type \"%s\"\n", filename, xmlfilt.Type)
 			os.Exit(1)

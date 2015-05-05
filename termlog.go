@@ -20,6 +20,10 @@ func NewConsoleLogWriter() ConsoleLogWriter {
 	return records
 }
 
+func (w ConsoleLogWriter) Flush() {
+	// DO nothing
+}
+
 func (w ConsoleLogWriter) run(out io.Writer) {
 	var timestr string
 	var timestrAt int64

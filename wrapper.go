@@ -276,3 +276,12 @@ func Critical(arg0 interface{}, args ...interface{}) error {
 	}
 	return nil
 }
+
+
+func FlushAll() {
+	for _, filt := range Global {
+		filt.Flush()
+	}
+}
+
+

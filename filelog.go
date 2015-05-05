@@ -3,9 +3,12 @@
 package log4go
 
 import (
-	"os"
 	"fmt"
+	"os"
 	"time"
+	"bufio"
+	"bytes"
+	"sync"
 )
 
 // This log writer sends output to a file
@@ -37,6 +40,18 @@ type FileLogWriter struct {
 
 	// Keep old logfiles (.001, .002, etc)
 	rotate bool
+	
+	// add buffer writer
+	*bufio.Writer
+
+	// timer chan
+	ticker *time.Ticker
+	
+	// chan bool for flush buffer writter
+	flush_chan chan bool
+	
+	// main wait for sub
+	wg	sync.WaitGroup
 }
 
 // This is the FileLogWriter's output method
@@ -44,8 +59,32 @@ func (w *FileLogWriter) LogWrite(rec *LogRecord) {
 	w.rec <- rec
 }
 
+func (w *FileLogWriter) Flush() {
+	w.flush_chan <- true
+}
+
+// Add flush Interface
+func (w *FileLogWriter) flushFile() {
+	if w.file !=nil && w.Writer != nil {
+		w.Writer.Flush()
+		w.file.Sync()
+	}
+}
+
+// proxy write to buffered writer
+func (w *FileLogWriter) writeToBuf(msg string) (int, error) {
+	var buf bytes.Buffer
+	n, err := fmt.Fprint(&buf, msg)
+	if err != nil {
+		return 0, err
+	}
+	w.file.Write(buf.Bytes())
+	return n, err
+}
+
 func (w *FileLogWriter) Close() {
 	close(w.rec)
+	w.wg.Wait()
 }
 
 // NewFileLogWriter creates a new LogWriter which writes to the given file and
@@ -58,12 +97,15 @@ func (w *FileLogWriter) Close() {
 // The standard log-line format is:
 //   [%D %T] [%L] (%S) %M
 func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
-	w := &FileLogWriter{
+	const flush_duration = time.Second * 5
+	w := &FileLogWriter {
 		rec:      make(chan *LogRecord, LogBufferLength),
 		rot:      make(chan bool),
 		filename: fname,
 		format:   "[%D %T] [%L] (%S) %M",
 		rotate:   rotate,
+		ticker:	  time.NewTicker(flush_duration),
+		flush_chan: make(chan bool),
 	}
 
 	// open the file for the first time
@@ -71,11 +113,15 @@ func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
 		fmt.Fprintf(os.Stderr, "FileLogWriter(%q): %s\n", w.filename, err)
 		return nil
 	}
-
+	
+	w.wg.Add(1)	
+	
 	go func() {
+		defer w.wg.Done()
 		defer func() {
 			if w.file != nil {
-				fmt.Fprint(w.file, FormatLogRecord(w.trailer, &LogRecord{Created: time.Now()}))
+				w.writeToBuf(FormatLogRecord(w.trailer, &LogRecord{Created: time.Now()}))
+				w.flushFile()
 				w.file.Close()
 			}
 		}()
@@ -102,7 +148,7 @@ func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
 				}
 
 				// Perform the write
-				n, err := fmt.Fprint(w.file, FormatLogRecord(w.format, rec))
+				n, err := w.writeToBuf(FormatLogRecord(w.format, rec))
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "FileLogWriter(%q): %s\n", w.filename, err)
 					return
@@ -111,7 +157,19 @@ func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
 				// Update the counts
 				w.maxlines_curlines++
 				w.maxsize_cursize += n
-			}
+			case _, ok := <-w.flush_chan:
+				fmt.Printf("---Flush call---%v \n", time.Now())
+				if !ok {
+					return
+				}
+				w.flushFile()
+			case _, ok := <-w.ticker.C:
+				fmt.Printf("---timer tick---%v \n", time.Now())
+				if !ok {
+					return
+				}
+				w.flushFile()
+ 			}
 		}
 	}()
 
@@ -123,11 +181,13 @@ func (w *FileLogWriter) Rotate() {
 	w.rot <- true
 }
 
+
 // If this is called in a threaded context, it MUST be synchronized
 func (w *FileLogWriter) intRotate() error {
 	// Close any log file that may be open
 	if w.file != nil {
-		fmt.Fprint(w.file, FormatLogRecord(w.trailer, &LogRecord{Created: time.Now()}))
+		w.writeToBuf(FormatLogRecord(w.trailer, &LogRecord{Created: time.Now()}))
+		w.flushFile()
 		w.file.Close()
 	}
 
@@ -161,12 +221,14 @@ func (w *FileLogWriter) intRotate() error {
 		return err
 	}
 	w.file = fd
-	
+	const bufferSize = 512 * 1024
 	// TODO set buffer
-	sb.Writer = bufio.NewWriterSize(w.file, bufferSize)
-	
+	w.Writer = bufio.NewWriterSize(w.file, bufferSize)
+
 	now := time.Now()
-	fmt.Fprint(w.file, FormatLogRecord(w.header, &LogRecord{Created: now}))
+	
+	// change logger
+	w.writeToBuf(FormatLogRecord(w.header, &LogRecord{Created: now}))
 
 	// Set the daily open date to the current date
 	w.daily_opendate = now.Day()
@@ -191,7 +253,7 @@ func (w *FileLogWriter) SetFormat(format string) *FileLogWriter {
 func (w *FileLogWriter) SetHeadFoot(head, foot string) *FileLogWriter {
 	w.header, w.trailer = head, foot
 	if w.maxlines_curlines == 0 {
-		fmt.Fprint(w.file, FormatLogRecord(w.header, &LogRecord{Created: time.Now()}))
+		w.writeToBuf(FormatLogRecord(w.header, &LogRecord{Created: time.Now()}))
 	}
 	return w
 }

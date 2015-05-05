@@ -3,7 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/golang/glog"
+//	"github.com/golang/glog"
+	l4g "github.com/wangjia3015/log4go"
 	"runtime"
 	"sync"
 	"time"
@@ -36,7 +37,6 @@ func (t *testT) add() {
 func (t *testT) doThreadWork(num int, f func()) {
 	for i := 0; i < t.writeNumPerThread; i++ {
 		f()
-		//	time.Sleep(time.Second)
 	}
 	defer t.wg.Done()
 }
@@ -69,11 +69,25 @@ func main() {
 	//t.threadNum = 1
 	//t.writeNumPerThread = 100000
 
+/*
 	fmt.Printf("thread Num %d write num %d per thread\n", t.threadNum, t.writeNumPerThread)
 	t.DoTest("say hello", func() {
 		//	fmt.Println("hello word")
 		glog.Error("Just for test")
 	})
+*/
+
+/*
+	for i := 0; i < t.writeNumPerThread ; i++ {
+		l4g.Error("just for test")
+	}
+*/
+	t.DoTest("l4g", func() {
+		//	fmt.Println("hello word")
+		l4g.Error("Just for test")
+	})
+
+	l4g.Close()
 
 	fmt.Println("work done")
 }

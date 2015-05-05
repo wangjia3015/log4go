@@ -117,6 +117,9 @@ type LogWriter interface {
 	// This should clean up anything lingering about the LogWriter, as it is called before
 	// the LogWriter is removed.  LogWrite should not be called after Close.
 	Close()
+	
+	// add by paipai
+	Flush()
 }
 
 /****** Logger ******/
@@ -154,9 +157,19 @@ func NewConsoleLogger(lvl level) Logger {
 // Create a new logger with a "stdout" filter configured to send log messages at
 // or above lvl to standard output.
 func NewDefaultLogger(lvl level) Logger {
-	return Logger{
-		"stdout": &Filter{lvl, NewConsoleLogWriter()},
-	}
+//	log := Logger{
+//		"stdout": &Filter{lvl, NewConsoleLogWriter()},
+//	}
+	log := make(Logger)
+	filename := "test.log"
+	flw := NewFileLogWriter(filename, false)
+	flw.SetFormat("[%D %T] [%L] (%S) %M")
+	flw.SetRotate(true)
+	flw.SetRotateSize(0)
+	flw.SetRotateLines(10000)
+	flw.SetRotateDaily(false)
+	log.AddFilter("file", FINE, flw)
+	return log
 }
 
 // Closes all log writers in preparation for exiting the program or a
